@@ -165,6 +165,23 @@ export class GdmLiveAudio extends LitElement {
             this.updateStatus('Opened');
           },
           onmessage: async (message: LiveServerMessage) => {
+            const userSpeech = message.serverContent?.inputTranscription?.text;
+            const modelSpeech = message.serverContent?.outputTranscription?.text;
+            if (userSpeech) {
+              console.log('user:', userSpeech);
+              this.conversationHistory = [
+                ...this.conversationHistory,
+                {text: userSpeech, isUser: true},
+              ];
+            }
+            if (modelSpeech) {
+              console.log('model:', modelSpeech);
+              this.conversationHistory = [
+                ...this.conversationHistory,
+                {text: modelSpeech, isUser: false},
+              ];
+            }
+
             const audio =
               message.serverContent?.modelTurn?.parts[0]?.inlineData;
 
@@ -209,7 +226,7 @@ export class GdmLiveAudio extends LitElement {
           },
         },
         config: {
-          responseModalities: [Modality.AUDIO],
+          responseModalities: [Modality.AUDIO, Modality.TEXT],
           speechConfig: {
             voiceConfig: {prebuiltVoiceConfig: {voiceName: this.selectedVoice}},
           },
@@ -369,12 +386,23 @@ export class GdmLiveAudio extends LitElement {
               <rect x="0" y="0" width="100" height="100" rx="15" />
             </svg>
           </button>
+          <button id="toggleTranscript" @click=${this.toggleConversation}>
+            ${this.showConversation ? 'Hide Transcript' : 'Show Transcript'}
+          </button>
         </div>
 
         <div id="status"> ${this.error} </div>
         <gdm-live-audio-visuals-3d
           .inputNode=${this.inputNode}
           .outputNode=${this.outputNode}></gdm-live-audio-visuals-3d>
+        ${this.showConversation ? html`
+          <div class="transcript">
+            ${this.conversationHistory.map(item => html`
+              <div class=${item.isUser ? 'user' : 'model'}>
+                ${item.text}
+              </div>`)}
+          </div>
+        ` : null}
       </div>
     `;
   }
