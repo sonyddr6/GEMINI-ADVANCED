@@ -5,7 +5,7 @@
  */
 
 import {GoogleGenAI, LiveServerMessage, Modality, Session} from '@google/genai';
-import {LitElement, css, html} from 'lit';
+import {LitElement, css, html, PropertyValues} from 'lit';
 import {customElement, state} from 'lit/decorators.js';
 import {createBlob, decode, decodeAudioData} from './utils';
 import './visual-3d';
@@ -165,6 +165,23 @@ export class GdmLiveAudio extends LitElement {
             this.updateStatus('Opened');
           },
           onmessage: async (message: LiveServerMessage) => {
+            const userSpeech = message.serverContent?.inputTranscription?.text;
+            const modelSpeech = message.serverContent?.outputTranscription?.text;
+            if (userSpeech) {
+              console.log('user:', userSpeech);
+              this.conversationHistory = [
+                ...this.conversationHistory,
+                {text: userSpeech, isUser: true},
+              ];
+            }
+            if (modelSpeech) {
+              console.log('model:', modelSpeech);
+              this.conversationHistory = [
+                ...this.conversationHistory,
+                {text: modelSpeech, isUser: false},
+              ];
+            }
+
             const audio =
               message.serverContent?.modelTurn?.parts[0]?.inlineData;
 
@@ -209,7 +226,7 @@ export class GdmLiveAudio extends LitElement {
           },
         },
         config: {
-          responseModalities: [Modality.AUDIO],
+          responseModalities: [Modality.AUDIO, Modality.TEXT],
           speechConfig: {
             voiceConfig: {prebuiltVoiceConfig: {voiceName: this.selectedVoice}},
           },
@@ -263,7 +280,11 @@ export class GdmLiveAudio extends LitElement {
         const inputBuffer = audioProcessingEvent.inputBuffer;
         const pcmData = inputBuffer.getChannelData(0);
 
-        this.session.sendRealtimeInput({media: createBlob(pcmData)});
+        if (this.session?.conn.readyState === WebSocket.OPEN) {
+          this.session.sendRealtimeInput({media: createBlob(pcmData)});
+        } else {
+          console.warn('Ignoring audio chunk; WebSocket not open');
+        }
       };
 
       this.sourceNode.connect(this.scriptProcessorNode);
@@ -318,6 +339,15 @@ export class GdmLiveAudio extends LitElement {
     this.showConversation = !this.showConversation;
   }
 
+  protected updated(changed: PropertyValues) {
+    if (changed.has('conversationHistory') && this.showConversation) {
+      const transcript = this.renderRoot.querySelector('.transcript') as HTMLElement | null;
+      if (transcript) {
+        transcript.scrollTop = transcript.scrollHeight;
+      }
+    }
+  }
+
   render() {
     return html`
       <div>
@@ -369,12 +399,23 @@ export class GdmLiveAudio extends LitElement {
               <rect x="0" y="0" width="100" height="100" rx="15" />
             </svg>
           </button>
+          <button id="toggleTranscript" @click=${this.toggleConversation}>
+            ${this.showConversation ? 'Hide Transcript' : 'Show Transcript'}
+          </button>
         </div>
 
         <div id="status"> ${this.error} </div>
         <gdm-live-audio-visuals-3d
           .inputNode=${this.inputNode}
           .outputNode=${this.outputNode}></gdm-live-audio-visuals-3d>
+        ${this.showConversation ? html`
+          <div class="transcript">
+            ${this.conversationHistory.map(item => html`
+              <div class=${item.isUser ? 'user' : 'model'}>
+                ${item.text}
+              </div>`)}
+          </div>
+        ` : null}
       </div>
     `;
   }
