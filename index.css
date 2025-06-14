@@ -3,23 +3,3 @@ body {
   align-items: center;
   justify-content: center;
 }
-
-.transcript {
-  position: absolute;
-  bottom: 20vh;
-  left: 0;
-  right: 0;
-  max-height: 40vh;
-  overflow-y: auto;
-  color: white;
-  padding: 10px;
-  background: rgba(0, 0, 0, 0.5);
-}
-
-.transcript .user {
-  text-align: right;
-}
-
-.transcript .model {
-  text-align: left;
-}
